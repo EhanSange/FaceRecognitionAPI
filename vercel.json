@@ -1,0 +1,14 @@
+{
+    "build":[
+        {
+            "src":"app.py",
+            "use":"@ercel/python"
+        }
+    ],
+    "routes":[
+        {
+            "src":"/(.*)",
+            "dest":"app.py"
+        }
+    ]
+}

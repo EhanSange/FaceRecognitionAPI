@@ -1,0 +1,64 @@
+import cv2
+import numpy as np
+import pickle
+from datetime import datetime
+import face_recognition  # Pastikan ini diimpor
+
+def markAttendance(name):
+    with open('Attendance.csv', 'r+') as f:
+        myDataList = f.readlines()
+        nameList = []
+        for line in myDataList:
+            entry = line.split(',')
+            nameList.append(entry[0])
+        if name not in nameList:
+            now = datetime.now()
+            dtString = now.strftime('%H:%M:%S')
+            f.writelines(f'\n{name}, {dtString}')
+
+# Load encoding dan nama dari file
+with open('encodings.pickle', 'rb') as f:
+    encodeListKnown, classNames = pickle.load(f)
+
+def euclidean_distance(a, b):
+    return np.linalg.norm(a - b)
+
+cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+while True:
+    success, img = cap.read()
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+
+    for (x, y, w, h) in faces:
+        face = img[y:y+h, x:x+w]
+        face = cv2.resize(face, (100, 100))
+        face_rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+        
+        # Convert face to 128-dimension encoding using dlib's face_recognition model
+        encode = face_recognition.face_encodings(face_rgb)
+        if len(encode) == 0:
+            continue
+        encode = encode[0]
+
+        # Compare the encodings
+        distances = [euclidean_distance(encode, known_encode) for known_encode in encodeListKnown]
+        matchIndex = np.argmin(distances)
+
+        if distances[matchIndex] < 0.6:  # Threshold for a match
+            name = classNames[matchIndex].upper()
+            markAttendance(name)
+            print(name)
+            cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            cv2.putText(img, name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2, cv2.LINE_AA)
+
+    cv2.imshow('Attendify', img)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()

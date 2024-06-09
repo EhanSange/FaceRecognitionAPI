@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition Attendance</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">Face Recognition Attendance System</h1>
+        <div class="text-center">
+            <button id="startButton" class="btn btn-primary">Start Capture</button>
+        </div>
+        <div class="mt-5">
+            <p class="text-center">Detected Name: <span id="detectedName"></span></p>
+            <div class="text-center">
+                <img id="detectedFace" src="" alt="Detected Face" class="img-thumbnail">
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div class="modal fade" id="cameraModal" tabindex="-1" aria-labelledby="cameraModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cameraModalLabel">Camera</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center">
+                        <img id="videoFeed" src="" alt="Video Feed" class="img-fluid">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const videoFeed = document.getElementById('videoFeed');
+        const detectedName = document.getElementById('detectedName');
+        const detectedFace = document.getElementById('detectedFace');
+        let intervalId; // Untuk menyimpan ID interval
+
+        function getLocationAndStart() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
+                    fetch('/verify_location', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ latitude, longitude }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'Success') {
+                            $('#cameraModal').modal('show');
+                        } else {
+                            alert('Location verification failed');
+                        }
+                    });
+                });
+            } else {
+                alert('Geolocation is not supported by this browser.');
+            }
+        }
+
+        startButton.addEventListener('click', getLocationAndStart);
+
+        $('#cameraModal').on('shown.bs.modal', () => {
+            videoFeed.src = "/video_capture";
+            intervalId = setInterval(() => {
+                fetch('/detected_name')
+                    .then(response => response.json())
+                    .then(data => {
+                        detectedName.textContent = data.name;
+                        if (data.face) {
+                            detectedFace.src = 'data:image/jpeg;base64,' + btoa(data.face);
+                            $('#cameraModal').modal('hide');
+                        } else {
+                            detectedFace.src = '';
+                        }
+                    });
+            }, 1000);
+        });
+
+        $('#cameraModal').on('hidden.bs.modal', () => {
+            videoFeed.src = "";
+            clearInterval(intervalId); // Menghentikan interval saat kamera dimatikan
+        });
+    </script>
+</body>
+</html>
